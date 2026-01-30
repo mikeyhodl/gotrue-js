@@ -1,7 +1,5 @@
 ![gotrue-js library](gotrue-js.png)
 
-[![Build Status](https://travis-ci.org/netlify/gotrue-js.svg?branch=main)](https://travis-ci.org/netlify/gotrue-js)
-
 This is a JavaScript client library for the [GoTrue](https://github.com/netlify/gotrue) API.
 
 It lets you create and authenticate users and is a building block for constructing
@@ -39,7 +37,22 @@ setCookie(optional): set to be `false` by default. If you wish to implement the 
 
 ### Error handling
 
-If an error occurs during the request, the promise may be rejected with an Error, `HTTPError`, `TextHTTPError`, or `JSONHTTPError`. See [micro-api-client-lib error types](https://github.com/netlify/micro-api-client-lib#class-httperror-extends-error).
+If an error occurs during the request, the promise may be rejected with an `Error`, `HTTPError`, `TextHTTPError`, or `JSONHTTPError`. These error classes are exported from the library and can be used for type checking:
+
+```js
+import GoTrue, { HTTPError, JSONHTTPError, TextHTTPError } from 'gotrue-js';
+
+auth.login(email, password)
+  .catch((error) => {
+    if (error instanceof JSONHTTPError) {
+      console.log('JSON error:', error.json);
+    } else if (error instanceof TextHTTPError) {
+      console.log('Text error:', error.data);
+    } else if (error instanceof HTTPError) {
+      console.log('HTTP error:', error.status);
+    }
+  });
+```
 
 ## Authentication examples
 
@@ -876,5 +889,4 @@ Currently we support Google, GitHub, GitLab, and BitBucket as directly supported
 
 - [gotrue](https://github.com/netlify/gotrue)
 - [netlify-identity-widget](https://github.com/netlify/netlify-identity-widget/)
-- [micro-api-client-library](https://github.com/netlify/micro-api-client-lib)
 - [Netlify identity docs](https://www.netlify.com/docs/identity/)

@@ -238,11 +238,12 @@ function urlBase64Decode(str: string): string {
       throw new Error('Illegal base64url string!');
   }
 
-  // polyfill https://github.com/davidchambers/Base64.js
-  const result = window.atob(output);
+  // Decode base64 to binary string, then convert to UTF-8
+  const binaryString = window.atob(output);
   try {
-    return decodeURIComponent(escape(result));
+    const bytes = Uint8Array.from(binaryString, (char) => char.codePointAt(0) ?? 0);
+    return new TextDecoder().decode(bytes);
   } catch {
-    return result;
+    return binaryString;
   }
 }

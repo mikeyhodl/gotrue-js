@@ -5,6 +5,7 @@ export type { Token } from './user';
 export type { UserData, UserAttributes } from './admin';
 export { default as User } from './user';
 export { default as Admin } from './admin';
+export { HTTPError, JSONHTTPError, TextHTTPError } from './api';
 
 export interface GoTrueInit {
   APIUrl?: string;
