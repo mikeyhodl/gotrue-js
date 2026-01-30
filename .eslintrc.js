@@ -79,10 +79,16 @@ module.exports = {
       },
     },
     {
-      files: ['tests/**/*.js'],
+      files: ['tests/**/*.js', 'tests/**/*.ts'],
       rules: {
         'node/no-unpublished-import': 0,
         'n/no-unpublished-import': 0,
+        'no-new': 0,
+        'class-methods-use-this': 0,
+        'prefer-destructuring': 0,
+        'no-inline-comments': 0,
+        'dot-notation': 0,
+        'unicorn/prefer-code-point': 0,
       },
     },
     {
