@@ -10,11 +10,21 @@ module.exports = {
     node: true,
     es6: true,
   },
+  settings: {
+    'import/resolver': {
+      node: {
+        extensions: ['.js', '.mjs', '.cjs'],
+      },
+    },
+    node: {
+      version: '>=20.0.0',
+      tryExtensions: ['.js', '.mjs', '.cjs', '.json'],
+    },
+  },
   rules: {
-    // eslint-plugin-ava needs to know where test files are located
-    'ava/no-ignored-test-files': [2, { files: ['tests/**/*.js'] }],
-
-    // TODO: enable these rules
+    // Disable rules that conflict with extensionless ES module imports
+    'n/no-missing-import': 0,
+    'import/no-unresolved': 0,
     'consistent-this': 0,
     'unicorn/no-this-assignment': 0,
     'func-style': 0,
@@ -59,6 +69,7 @@ module.exports = {
       files: ['tests/**/*.js'],
       rules: {
         'node/no-unpublished-import': 0,
+        'n/no-unpublished-import': 0,
       },
     },
     {
