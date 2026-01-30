@@ -35,7 +35,7 @@ test('should not log token on error', () => {
   new User({}, tokenResponse, '');
 
   expect(errorSpy).toHaveBeenCalledOnce();
-  const [error] = errorSpy.mock.calls[0];
+  const [[error]] = errorSpy.mock.calls;
   expect(error).toBeInstanceOf(Error);
   expect(error.message).not.toContain(tokenResponse.access_token);
 });
