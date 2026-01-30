@@ -44,5 +44,5 @@ jobs:
         shell: bash
       - uses: codecov/codecov-action@v5
         with:
-          file: coverage/coverage-final.json
+          files: coverage/coverage-final.json
           flags: ${{ steps.test-coverage-flags.outputs.os }},${{ steps.test-coverage-flags.outputs.node }}
