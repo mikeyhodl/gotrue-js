@@ -54,6 +54,14 @@ module.exports = {
   overrides: [
     ...overrides,
     {
+      files: ['*.d.ts'],
+      rules: {
+        'max-classes-per-file': 0,
+        'unicorn/filename-case': 0,
+        'unicorn/custom-error-definition': 0,
+      },
+    },
+    {
       files: ['*.ts'],
       parser: '@typescript-eslint/parser',
       extends: [
@@ -64,6 +72,11 @@ module.exports = {
         'plugin:import/warnings',
         'plugin:import/typescript',
       ],
+      rules: {
+        'no-use-before-define': 0,
+        '@typescript-eslint/no-this-alias': 0,
+        'promise/prefer-await-to-callbacks': 0,
+      },
     },
     {
       files: ['tests/**/*.js'],
