@@ -25,16 +25,18 @@
   ],
   "license": "MIT",
   "main": "lib/index.js",
-  "types": "index.d.ts",
+  "types": "lib/index.d.ts",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/netlify/gotrue-js.git"
   },
   "scripts": {
-    "build:browser": "esbuild src/index.js --bundle --minify --format=iife --global-name=GoTrue --outfile=browser/gotrue.js",
-    "build:lib": "esbuild src/*.js --format=cjs --outdir=lib",
-    "build": "npm run build:browser && npm run build:lib",
-    "prepare": "husky && npm run build:lib",
+    "build:browser": "esbuild src/index.ts --bundle --minify --format=iife --global-name=GoTrue --outfile=browser/gotrue.js",
+    "build:lib": "esbuild src/index.ts src/user.ts src/admin.ts --format=cjs --outdir=lib",
+    "build:types": "tsc --emitDeclarationOnly",
+    "build": "npm run build:browser && npm run build:lib && npm run build:types",
+    "typecheck": "tsc --noEmit",
+    "prepare": "husky && npm run build:lib && npm run build:types",
     "prepublishOnly": "run-s prepublishOnly:*",
     "prepublishOnly:checkout": "run-local \"git checkout main\"",
     "prepublishOnly:pull": "run-local \"git pull\"",
@@ -53,7 +55,7 @@
     "test:ci": "vitest run --coverage"
   },
   "config": {
-    "eslint": "--ignore-path .gitignore --cache --format=codeframe --max-warnings=0 \"{src,tests,.github}/**/*.{js,md,html}\"",
-    "prettier": "--ignore-path .gitignore --loglevel=warn \"{src,tests,.github}/**/*.{js,md,yml,json,html}\" \"*.{js,yml,json,html}\" \".*.{js,yml,json,html}\" \"!package-lock.json\" \"!CHANGELOG.md\""
+    "eslint": "--ignore-path .gitignore --cache --format=codeframe --max-warnings=0 \"{src,tests,.github}/**/*.{js,ts,md,html}\"",
+    "prettier": "--ignore-path .gitignore --loglevel=warn \"{src,tests,.github}/**/*.{js,ts,md,yml,json,html}\" \"*.{js,ts,yml,json,html}\" \".*.{js,ts,yml,json,html}\" \"!package-lock.json\" \"!CHANGELOG.md\""
   }
 }

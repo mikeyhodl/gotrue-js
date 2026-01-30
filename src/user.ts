@@ -1,17 +1,43 @@
-import API, { JSONHTTPError } from 'micro-api-client';
+import API, { JSONHTTPError, type RequestOptions } from 'micro-api-client';
 
-import Admin from './admin';
+import Admin, { type UserData } from './admin';
+
+export interface Token {
+  access_token: string;
+  expires_at: number;
+  expires_in: number;
+  refresh_token: string;
+  token_type: 'bearer';
+}
 
 const ExpiryMargin = 60 * 1000;
 const storageKey = 'gotrue.user';
-const refreshPromises = {};
-let currentUser = null;
-const forbiddenUpdateAttributes = { api: 1, token: 1, audience: 1, url: 1 };
-const forbiddenSaveAttributes = { api: 1 };
-const isBrowser = () => typeof window !== 'undefined';
+const refreshPromises: Record<string, Promise<string>> = {};
+let currentUser: User | null = null;
+const forbiddenUpdateAttributes: Record<string, number> = { api: 1, token: 1, audience: 1, url: 1 };
+const forbiddenSaveAttributes: Record<string, number> = { api: 1 };
+const isBrowser = (): boolean => typeof window !== 'undefined';
 
 export default class User {
-  constructor(api, tokenResponse, audience) {
+  api: API;
+  url: string;
+  audience: string;
+  token!: Token;
+  _fromStorage?: boolean;
+
+  // Dynamic properties from user data
+  id!: string;
+  aud!: string;
+  email!: string;
+  role!: string;
+  app_metadata!: Record<string, unknown>;
+  user_metadata!: Record<string, unknown>;
+  created_at!: string;
+  updated_at!: string;
+  confirmed_at!: string;
+  [key: string]: unknown;
+
+  constructor(api: API, tokenResponse: Token, audience: string) {
     this.api = api;
     this.url = api.apiURL;
     this.audience = audience;
@@ -19,11 +45,11 @@ export default class User {
     currentUser = this;
   }
 
-  static removeSavedSession() {
+  static removeSavedSession(): void {
     isBrowser() && localStorage.removeItem(storageKey);
   }
 
-  static recoverSession(apiInstance) {
+  static recoverSession(apiInstance?: API): User | null {
     if (currentUser) {
       return currentUser;
     }
@@ -48,18 +74,19 @@ export default class User {
     return null;
   }
 
-  get admin() {
+  get admin(): Admin {
     return new Admin(this);
   }
 
-  update(attributes) {
-    return this._request('/user', {
+  async update(attributes: Record<string, unknown>): Promise<User> {
+    const response = await this._request<UserData>('/user', {
       method: 'PUT',
       body: JSON.stringify(attributes),
-    }).then((response) => this._saveUserData(response)._refreshSavedSession());
+    });
+    return this._saveUserData(response)._refreshSavedSession();
   }
 
-  jwt(forceRefresh) {
+  jwt(forceRefresh?: boolean): Promise<string> {
     const token = this.tokenDetails();
     if (token === null || token === undefined) {
       return Promise.reject(new Error(`Gotrue-js: failed getting jwt access token`));
@@ -71,19 +98,20 @@ export default class User {
     return Promise.resolve(access_token);
   }
 
-  logout() {
-    return this._request('/logout', { method: 'POST' })
+  logout(): Promise<void> {
+    return this._request<void>('/logout', { method: 'POST' })
       .then(this.clearSession.bind(this))
       .catch(this.clearSession.bind(this));
   }
 
-  _refreshToken(refresh_token) {
-    if (refreshPromises[refresh_token]) {
-      return refreshPromises[refresh_token];
+  _refreshToken(refresh_token: string): Promise<string> {
+    const existingPromise = refreshPromises[refresh_token];
+    if (existingPromise) {
+      return existingPromise;
     }
 
-    return (refreshPromises[refresh_token] = this.api
-      .request('/token', {
+    const promise = this.api
+      .request<Token>('/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: `grant_type=refresh_token&refresh_token=${refresh_token}`,
@@ -94,15 +122,17 @@ export default class User {
         this._refreshSavedSession();
         return this.token.access_token;
       })
-      // eslint-disable-next-line promise/prefer-await-to-callbacks
       .catch((error) => {
         delete refreshPromises[refresh_token];
         this.clearSession();
         throw error;
-      }));
+      });
+
+    refreshPromises[refresh_token] = promise;
+    return promise;
   }
 
-  async _request(path, options = {}) {
+  async _request<T = unknown>(path: string, options: RequestOptions = {}): Promise<T> {
     options.headers = options.headers || {};
 
     const aud = options.audience || this.audience;
@@ -112,7 +142,7 @@ export default class User {
 
     try {
       const token = await this.jwt();
-      return await this.api.request(path, {
+      return await this.api.request<T>(path, {
         headers: Object.assign(options.headers, {
           Authorization: `Bearer ${token}`,
         }),
@@ -130,13 +160,12 @@ export default class User {
     }
   }
 
-  getUserData() {
-    return this._request('/user')
-      .then(this._saveUserData.bind(this))
-      .then(this._refreshSavedSession.bind(this));
+  async getUserData(): Promise<User> {
+    const response = await this._request<UserData>('/user');
+    return this._saveUserData(response)._refreshSavedSession();
   }
 
-  _saveUserData(attributes, fromStorage) {
+  _saveUserData(attributes: Record<string, unknown>, fromStorage?: boolean): User {
     for (const key in attributes) {
       if (key in User.prototype || key in forbiddenUpdateAttributes) {
         continue;
@@ -149,7 +178,7 @@ export default class User {
     return this;
   }
 
-  _processTokenResponse(tokenResponse) {
+  _processTokenResponse(tokenResponse: Token): void {
     this.token = tokenResponse;
     try {
       const claims = JSON.parse(urlBase64Decode(tokenResponse.access_token.split('.')[1]));
@@ -159,7 +188,7 @@ export default class User {
     }
   }
 
-  _refreshSavedSession() {
+  _refreshSavedSession(): User {
     // only update saved session if we previously saved something
     if (isBrowser() && localStorage.getItem(storageKey)) {
       this._saveSession();
@@ -167,8 +196,8 @@ export default class User {
     return this;
   }
 
-  get _details() {
-    const userCopy = {};
+  get _details(): Record<string, unknown> {
+    const userCopy: Record<string, unknown> = {};
     for (const key in this) {
       if (key in User.prototype || key in forbiddenSaveAttributes) {
         continue;
@@ -178,23 +207,23 @@ export default class User {
     return userCopy;
   }
 
-  _saveSession() {
+  _saveSession(): User {
     isBrowser() && localStorage.setItem(storageKey, JSON.stringify(this._details));
     return this;
   }
 
-  tokenDetails() {
+  tokenDetails(): Token {
     return this.token;
   }
 
-  clearSession() {
+  clearSession(): void {
     User.removeSavedSession();
-    this.token = null;
+    this.token = null as unknown as Token;
     currentUser = null;
   }
 }
 
-function urlBase64Decode(str) {
+function urlBase64Decode(str: string): string {
   // From https://jwt.io/js/jwt.js
   let output = str.replace(/-/g, '+').replace(/_/g, '/');
   switch (output.length % 4) {
@@ -207,10 +236,10 @@ function urlBase64Decode(str) {
       output += '=';
       break;
     default:
-      throw 'Illegal base64url string!';
+      throw new Error('Illegal base64url string!');
   }
 
-  // polifyll https://github.com/davidchambers/Base64.js
+  // polyfill https://github.com/davidchambers/Base64.js
   const result = window.atob(output);
   try {
     return decodeURIComponent(escape(result));

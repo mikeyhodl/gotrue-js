@@ -3,12 +3,15 @@
     "target": "ES2020",
     "module": "ESNext",
     "moduleResolution": "node",
-    "allowJs": true,
-    "checkJs": false,
-    "declaration": false,
+    "declaration": true,
+    "declarationDir": "./lib",
+    "outDir": "./lib",
     "esModuleInterop": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "strict": true,
+    "noImplicitAny": true,
+    "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*", "tests/**/*"],
-  "exclude": ["node_modules", "lib", "browser"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "lib", "browser", "tests"]
 }

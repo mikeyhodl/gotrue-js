@@ -1,12 +1,40 @@
-import API, { JSONHTTPError } from 'micro-api-client';
+import API, { JSONHTTPError, type RequestOptions } from 'micro-api-client';
 
-import User from './user';
+import User, { type Token } from './user';
+
+export type { Token } from './user';
+export type { UserData, UserAttributes } from './admin';
+export { default as User } from './user';
+export { default as Admin } from './admin';
+
+export interface GoTrueInit {
+  APIUrl?: string;
+  audience?: string;
+  setCookie?: boolean;
+}
+
+export interface Settings {
+  autoconfirm: boolean;
+  disable_signup: boolean;
+  external: {
+    bitbucket: boolean;
+    email: boolean;
+    facebook: boolean;
+    github: boolean;
+    gitlab: boolean;
+    google: boolean;
+  };
+}
 
 const HTTPRegexp = /^http:\/\//;
 const defaultApiURL = `/.netlify/identity`;
 
 export default class GoTrue {
-  constructor({ APIUrl = defaultApiURL, audience = '', setCookie = false } = {}) {
+  audience?: string;
+  setCookie: boolean;
+  api: API;
+
+  constructor({ APIUrl = defaultApiURL, audience = '', setCookie = false }: GoTrueInit = {}) {
     if (HTTPRegexp.test(APIUrl)) {
       console.warn(
         'Warning:\n\nDO NOT USE HTTP IN PRODUCTION FOR GOTRUE EVER!\nGoTrue REQUIRES HTTPS to work securely.',
@@ -18,18 +46,17 @@ export default class GoTrue {
     }
 
     this.setCookie = setCookie;
-
     this.api = new API(APIUrl);
   }
 
-  async _request(path, options = {}) {
+  async _request<T = unknown>(path: string, options: RequestOptions = {}): Promise<T> {
     options.headers = options.headers || {};
     const aud = options.audience || this.audience;
     if (aud) {
       options.headers['X-JWT-AUD'] = aud;
     }
     try {
-      return await this.api.request(path, options);
+      return await this.api.request<T>(path, options);
     } catch (error) {
       if (error instanceof JSONHTTPError && error.json) {
         if (error.json.msg) {
@@ -42,20 +69,20 @@ export default class GoTrue {
     }
   }
 
-  settings() {
-    return this._request('/settings');
+  settings(): Promise<Settings> {
+    return this._request<Settings>('/settings');
   }
 
-  signup(email, password, data) {
+  signup(email: string, password: string, data?: Record<string, unknown>): Promise<User> {
     return this._request('/signup', {
       method: 'POST',
       body: JSON.stringify({ email, password, data }),
     });
   }
 
-  login(email, password, remember) {
+  login(email: string, password: string, remember?: boolean): Promise<User> {
     this._setRememberHeaders(remember);
-    return this._request('/token', {
+    return this._request<Token>('/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: `grant_type=password&username=${encodeURIComponent(
@@ -67,42 +94,42 @@ export default class GoTrue {
     });
   }
 
-  loginExternalUrl(provider) {
+  loginExternalUrl(provider: string): string {
     return `${this.api.apiURL}/authorize?provider=${provider}`;
   }
 
-  confirm(token, remember) {
+  confirm(token: string, remember?: boolean): Promise<User> {
     this._setRememberHeaders(remember);
     return this.verify('signup', token, remember);
   }
 
-  requestPasswordRecovery(email) {
+  requestPasswordRecovery(email: string): Promise<void> {
     return this._request('/recover', {
       method: 'POST',
       body: JSON.stringify({ email }),
     });
   }
 
-  recover(token, remember) {
+  recover(token: string, remember?: boolean): Promise<User> {
     this._setRememberHeaders(remember);
     return this.verify('recovery', token, remember);
   }
 
-  acceptInvite(token, password, remember) {
+  acceptInvite(token: string, password: string, remember?: boolean): Promise<User> {
     this._setRememberHeaders(remember);
-    return this._request('/verify', {
+    return this._request<Token>('/verify', {
       method: 'POST',
       body: JSON.stringify({ token, password, type: 'signup' }),
     }).then((response) => this.createUser(response, remember));
   }
 
-  acceptInviteExternalUrl(provider, token) {
+  acceptInviteExternalUrl(provider: string, token: string): string {
     return `${this.api.apiURL}/authorize?provider=${provider}&invite_token=${token}`;
   }
 
-  createUser(tokenResponse, remember = false) {
+  createUser(tokenResponse: Token, remember = false): Promise<User> {
     this._setRememberHeaders(remember);
-    const user = new User(this.api, tokenResponse, this.audience);
+    const user = new User(this.api, tokenResponse, this.audience || '');
     return user.getUserData().then((userData) => {
       if (remember) {
         userData._saveSession();
@@ -111,21 +138,21 @@ export default class GoTrue {
     });
   }
 
-  currentUser() {
+  currentUser(): User | null {
     const user = User.recoverSession(this.api);
     user && this._setRememberHeaders(user._fromStorage);
     return user;
   }
 
-  verify(type, token, remember) {
+  verify(type: string, token: string, remember?: boolean): Promise<User> {
     this._setRememberHeaders(remember);
-    return this._request('/verify', {
+    return this._request<Token>('/verify', {
       method: 'POST',
       body: JSON.stringify({ token, type }),
     }).then((response) => this.createUser(response, remember));
   }
 
-  _setRememberHeaders(remember) {
+  _setRememberHeaders(remember?: boolean): void {
     if (this.setCookie) {
       this.api.defaultHeaders = this.api.defaultHeaders || {};
       this.api.defaultHeaders['X-Use-Cookie'] = remember ? '1' : 'session';
@@ -134,5 +161,11 @@ export default class GoTrue {
 }
 
 if (typeof window !== 'undefined') {
-  window.GoTrue = GoTrue;
+  (window as Window & { GoTrue: typeof GoTrue }).GoTrue = GoTrue;
+}
+
+declare global {
+  interface Window {
+    GoTrue: typeof GoTrue;
+  }
 }
